@@ -39,7 +39,7 @@ function createWindow(): void {
 
 function registerIpc(): void {
   const settingsPath = join(app.getPath('userData'), 'settings.json');
-  const projectsRoot = join(app.getPath('documents'), 'AsePilot', 'projects');
+  const defaultProjectsRoot = join(app.getPath('documents'), 'AsePilot', 'projects');
 
   ipcMain.handle('asepilot:get-settings', async (): Promise<AppSettings> => readSettings(settingsPath));
 
@@ -107,9 +107,24 @@ function registerIpc(): void {
     return result.canceled ? null : result.filePaths[0] ?? null;
   });
 
+  ipcMain.handle('asepilot:select-output-folder', async (): Promise<string | null> => {
+    const result = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, {
+          title: 'Select AsePilot output folder',
+          properties: ['openDirectory', 'createDirectory']
+        })
+      : await dialog.showOpenDialog({
+          title: 'Select AsePilot output folder',
+          properties: ['openDirectory', 'createDirectory']
+        });
+
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+
   ipcMain.handle('asepilot:run-pipeline', async (_event, requestValue: PixelRequest): Promise<PipelineResultView> => {
     const request = parsePixelRequest(requestValue);
     const settings = await readSettings(settingsPath);
+    const projectsRoot = settings.outputRoot.trim() || defaultProjectsRoot;
     const result = await runPipeline({
       request,
       projectsRoot,

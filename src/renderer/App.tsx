@@ -19,7 +19,7 @@ import { stylePresetLabels, type AppSettings, type PipelineResultView } from '..
 const SIZE_PRESETS = [16, 32, 64, 128] as const;
 
 export function App(): ReactElement {
-  const [settings, setSettings] = useState<AppSettings>({ asepritePath: '' });
+  const [settings, setSettings] = useState<AppSettings>({ asepritePath: '', outputRoot: '' });
   const [imagePath, setImagePath] = useState('');
   const [targetWidth, setTargetWidth] = useState(32);
   const [targetHeight, setTargetHeight] = useState(32);
@@ -65,6 +65,17 @@ export function App(): ReactElement {
     const nextSettings = await window.asepilot.saveSettings({
       ...settings,
       asepritePath: selected
+    });
+    setSettings(nextSettings);
+  }
+
+  async function handleSelectOutputFolder(): Promise<void> {
+    const selected = await window.asepilot.selectOutputFolder();
+    if (!selected) return;
+
+    const nextSettings = await window.asepilot.saveSettings({
+      ...settings,
+      outputRoot: selected
     });
     setSettings(nextSettings);
   }
@@ -206,6 +217,33 @@ export function App(): ReactElement {
               Output
               <input onChange={(event) => setOutputName(event.target.value)} type="text" value={outputName} />
             </label>
+          </section>
+
+          <section className="control-section">
+            <div className="section-title">
+              <FolderOpen size={18} />
+              <h2>Output Folder</h2>
+            </div>
+            <div className="button-row">
+              <button className="secondary-action" onClick={() => void handleSelectOutputFolder()}>
+                <FolderOpen size={17} />
+                Browse
+              </button>
+              <button className="icon-action" disabled={isSavingSettings} onClick={() => void handleSaveSettings()} title="Save settings">
+                {isSavingSettings ? <Loader2 className="spin" size={17} /> : <Save size={17} />}
+              </button>
+            </div>
+            <input
+              onChange={(event) =>
+                setSettings({
+                  ...settings,
+                  outputRoot: event.target.value
+                })
+              }
+              placeholder="Default: Documents\\AsePilot\\projects"
+              type="text"
+              value={settings.outputRoot}
+            />
           </section>
 
           <section className="control-section">

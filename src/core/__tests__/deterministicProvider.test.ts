@@ -42,5 +42,33 @@ describe('DeterministicProvider', () => {
       size: expect.any(Number)
     });
   });
-});
 
+  it('keeps palette colors unique for large single-color renders', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'asepilot-'));
+    const source = join(directory, 'solid-black.png');
+
+    await sharp({
+      create: {
+        width: 32,
+        height: 32,
+        channels: 4,
+        background: '#000000ff'
+      }
+    })
+      .png()
+      .toFile(source);
+
+    const provider = new DeterministicProvider();
+    const plan = await provider.analyze({
+      imagePath: source,
+      targetWidth: 128,
+      targetHeight: 128,
+      paletteMax: 16,
+      stylePreset: 'icon',
+      outputName: 'solid-black'
+    });
+    const colors = plan.palette.map((color) => color.hex);
+
+    expect(new Set(colors).size).toBe(colors.length);
+  });
+});

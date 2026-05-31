@@ -11,7 +11,7 @@
     "build": "npm run typecheck && electron-vite build --config electron.vite.config.mjs",
     "lint": "eslint .",
     "preview": "electron-vite preview --config electron.vite.config.mjs",
-    "test": "vitest run --environment node",
+    "test": "vitest run --environment node --no-cache",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

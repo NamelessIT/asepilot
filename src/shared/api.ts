@@ -2,6 +2,7 @@ import type { PipelineResult, PixelRequest, StylePreset } from '../core/types';
 
 export interface AppSettings {
   asepritePath: string;
+  outputRoot: string;
 }
 
 export interface PipelineResultView extends PipelineResult {
@@ -15,6 +16,7 @@ export interface AsePilotApi {
   saveSettings(settings: AppSettings): Promise<AppSettings>;
   selectImage(): Promise<string | null>;
   selectAseprite(): Promise<string | null>;
+  selectOutputFolder(): Promise<string | null>;
   runPipeline(request: PixelRequest): Promise<PipelineResultView>;
   revealPath(path: string): Promise<void>;
 }
@@ -26,4 +28,3 @@ export const stylePresetLabels: Record<StylePreset, string> = {
   icon: 'Icon',
   portrait: 'Portrait'
 };
-

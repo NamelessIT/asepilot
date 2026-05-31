@@ -57,6 +57,12 @@ $env:ASEPRITE_PATH="C:\Program Files\Aseprite\Aseprite.exe"
 npm.cmd run dev
 ```
 
+The output folder can be selected in the app. If left blank, AsePilot uses:
+
+```text
+Documents/AsePilot/projects
+```
+
 ## Commands
 
 ```bash
@@ -103,6 +109,10 @@ Each run produces:
 - v0.4: Revision loop with preview comparison.
 - v0.5: Packaging, settings, project history.
 - v1.0: Stable desktop release.
+
+## Aseprite Guide
+
+Vietnamese usage notes for editing generated files are available in [`docs/aseprite-guide-vi.md`](docs/aseprite-guide-vi.md).
 
 ## License
 
