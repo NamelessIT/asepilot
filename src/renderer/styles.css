@@ -1,0 +1,382 @@
+:root {
+  color: #18202a;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #edf1f3;
+  margin: 0;
+  min-width: 980px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  align-items: center;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 22px;
+}
+
+.topbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto 18px;
+  max-width: 1320px;
+}
+
+.topbar h1 {
+  font-size: 28px;
+  line-height: 1;
+  margin: 0 0 7px;
+}
+
+.topbar p {
+  color: #607080;
+  font-size: 14px;
+  margin: 0;
+}
+
+.workspace-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 360px minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1320px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(31, 42, 54, 0.08);
+}
+
+.controls-panel {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.control-section {
+  border-bottom: 1px solid #e5ebef;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.control-section:last-child {
+  border-bottom: 0;
+}
+
+.section-title {
+  align-items: center;
+  color: #22313f;
+  display: flex;
+  gap: 8px;
+}
+
+.section-title h2,
+.preview-header h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.primary-action {
+  background: #1e6f68;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  min-height: 42px;
+  padding: 0 18px;
+}
+
+.primary-action:hover:not(:disabled) {
+  background: #195f59;
+}
+
+.secondary-action,
+.artifact-button {
+  background: #e7eff2;
+  border: 1px solid #cddae1;
+  border-radius: 8px;
+  color: #1e3a46;
+  font-weight: 650;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.secondary-action:hover,
+.artifact-button:hover {
+  background: #dce8ed;
+}
+
+.icon-action {
+  aspect-ratio: 1;
+  background: #26313c;
+  border-radius: 8px;
+  color: #fff;
+  min-height: 38px;
+  width: 38px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.path-line {
+  background: #f4f7f8;
+  border: 1px solid #dce5e9;
+  border-radius: 6px;
+  color: #687786;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  min-height: 36px;
+  overflow: hidden;
+  padding: 8px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmented {
+  background: #f3f6f7;
+  border: 1px solid #d6e0e6;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+}
+
+.segmented button {
+  background: transparent;
+  border-right: 1px solid #d6e0e6;
+  color: #536271;
+  min-height: 36px;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented .selected {
+  background: #d0952f;
+  color: #1d1506;
+  font-weight: 800;
+}
+
+.input-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+label {
+  color: #536271;
+  display: grid;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+input,
+select {
+  background: #fbfcfd;
+  border: 1px solid #ccd7df;
+  border-radius: 7px;
+  color: #1d2935;
+  min-height: 38px;
+  outline: none;
+  padding: 0 10px;
+  width: 100%;
+}
+
+input:focus,
+select:focus {
+  border-color: #1e6f68;
+  box-shadow: 0 0 0 3px rgba(30, 111, 104, 0.16);
+}
+
+.preview-panel {
+  min-height: 610px;
+  padding: 18px;
+}
+
+.preview-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.preview-header p {
+  color: #667787;
+  font-size: 13px;
+  margin: 5px 0 0;
+}
+
+.empty-state {
+  align-items: center;
+  border: 1px dashed #c8d4db;
+  border-radius: 8px;
+  color: #637282;
+  display: grid;
+  gap: 10px;
+  min-height: 510px;
+  place-content: center;
+}
+
+.result-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 250px;
+}
+
+.image-stage {
+  align-items: center;
+  background:
+    linear-gradient(45deg, #dfe7eb 25%, transparent 25%),
+    linear-gradient(-45deg, #dfe7eb 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #dfe7eb 75%),
+    linear-gradient(-45deg, transparent 75%, #dfe7eb 75%);
+  background-color: #f7fafb;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+  border: 1px solid #d5e0e6;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  min-height: 520px;
+  overflow: auto;
+  padding: 24px;
+}
+
+.image-stage img {
+  image-rendering: pixelated;
+  max-height: 480px;
+  max-width: 100%;
+  min-height: 256px;
+  object-fit: contain;
+}
+
+.result-sidebar {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+}
+
+.status-box {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  gap: 9px;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.status-box.success {
+  background: #dff4e7;
+  color: #1d6339;
+}
+
+.status-box.skipped {
+  background: #fff3d8;
+  color: #7a4d0b;
+}
+
+.status-box.failed,
+.status-box.error {
+  background: #ffe5e2;
+  color: #8f2d24;
+  margin-bottom: 12px;
+}
+
+.palette-strip {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(8, 1fr);
+}
+
+.swatch {
+  aspect-ratio: 1;
+  border: 1px solid rgba(24, 32, 42, 0.2);
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.artifact-button {
+  display: grid;
+  grid-template-columns: 18px 1fr 16px;
+  justify-content: start;
+  text-align: left;
+  width: 100%;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1040px) {
+  body {
+    min-width: 0;
+  }
+
+  .app-shell {
+    padding: 14px;
+  }
+
+  .topbar,
+  .workspace-grid {
+    max-width: none;
+  }
+
+  .workspace-grid,
+  .result-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .image-stage {
+    min-height: 380px;
+  }
+}
+

@@ -1,0 +1,41 @@
+{
+  "name": "asepilot",
+  "version": "0.1.0",
+  "description": "AI-assisted Aseprite coworker that turns reference images into editable pixel-art projects.",
+  "license": "MIT",
+  "author": "NamelessIT",
+  "type": "module",
+  "main": "out/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev --config electron.vite.config.mjs",
+    "build": "npm run typecheck && electron-vite build --config electron.vite.config.mjs",
+    "lint": "eslint .",
+    "preview": "electron-vite preview --config electron.vite.config.mjs",
+    "test": "vitest run --environment node",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "execa": "^9.6.0",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.33.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "electron": "^34.0.0",
+    "electron-vite": "^3.0.0",
+    "eslint": "^9.18.0",
+    "globals": "^15.14.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}
