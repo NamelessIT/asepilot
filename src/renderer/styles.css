@@ -164,6 +164,28 @@ button:disabled {
   white-space: nowrap;
 }
 
+.hint-box {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 8px;
+  line-height: 1.4;
+  min-height: 40px;
+  padding: 9px 10px;
+}
+
+.hint-box.warning {
+  background: #fff3d8;
+  color: #75500d;
+}
+
+.hint-box.info {
+  background: #e2f3f1;
+  color: #1d5f58;
+}
+
 .segmented {
   background: #f3f6f7;
   border: 1px solid #d6e0e6;
@@ -379,4 +401,3 @@ select:focus {
     min-height: 380px;
   }
 }
-

@@ -2,11 +2,26 @@ export const STYLE_PRESETS = [
   'rpg-item',
   'top-down-character',
   'platformer-sprite',
+  'side-view-character',
+  'isometric-prop',
+  'tileset-prop',
   'icon',
   'portrait'
 ] as const;
 
 export type StylePreset = (typeof STYLE_PRESETS)[number];
+
+export const SEGMENTATION_MODES = ['none', 'auto-local', 'center-subject', 'ai-model'] as const;
+
+export type SegmentationMode = (typeof SEGMENTATION_MODES)[number];
+
+export const ANIMATION_MODES = ['single', 'idle-4frame', 'topdown-4dir', 'topdown-walk-8', 'item-shine-4frame'] as const;
+
+export type AnimationMode = (typeof ANIMATION_MODES)[number];
+
+export const AGENT_PROVIDER_IDS = ['local', 'openai-compatible', 'cli-json'] as const;
+
+export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number];
 
 export interface PixelRequest {
   imagePath: string;
@@ -14,6 +29,8 @@ export interface PixelRequest {
   targetHeight: number;
   paletteMax: number;
   stylePreset: StylePreset;
+  segmentationMode: SegmentationMode;
+  animationMode: AnimationMode;
   outputName: string;
 }
 
@@ -26,6 +43,19 @@ export interface PixelLayer {
   name: string;
   opacity?: number;
   visible?: boolean;
+}
+
+export interface PixelFrame {
+  index: number;
+  durationMs?: number;
+  label?: string;
+}
+
+export interface PixelAnimation {
+  name: string;
+  from: number;
+  to: number;
+  direction?: string;
 }
 
 interface DrawOpBase {
@@ -103,6 +133,8 @@ export interface PixelPlan {
   };
   palette: PaletteColor[];
   layers: PixelLayer[];
+  frames?: PixelFrame[];
+  animations?: PixelAnimation[];
   drawOps: DrawOp[];
   artistNotes: string[];
 }
@@ -147,4 +179,3 @@ export interface PipelineResult {
   aseprite: AsepriteRunResult;
   plan: PixelPlan;
 }
-

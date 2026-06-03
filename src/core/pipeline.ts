@@ -4,13 +4,16 @@ import { preprocessReferenceImage } from './imagePreprocessor';
 import { renderPlanToPng } from './planRenderer';
 import { runAsepriteScript } from './aseprite/runner';
 import { generateAsepriteLua } from './lua/generateLua';
-import { DeterministicProvider } from './providers/deterministicProvider';
+import { createAgentProvider } from './providers/createAgentProvider';
 import { parsePixelPlan, parsePixelRequest } from './schema';
+import { assertSemanticIdentityMatchesReference } from './semanticIdentityGuard';
+import type { AgentProviderConfig } from './providers/agentProvider';
 import type { PipelineResult, PixelRequest } from './types';
 
 export interface RunPipelineOptions {
   request: PixelRequest;
   projectsRoot: string;
+  agentProvider: AgentProviderConfig;
   asepritePath?: string | null;
   overwrite?: boolean;
 }
@@ -26,13 +29,14 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 
   await preprocessReferenceImage(request.imagePath, paths);
 
-  const provider = new DeterministicProvider();
+  const provider = createAgentProvider(options.agentProvider);
   const plan = parsePixelPlan(
     await provider.analyze({
       ...request,
       imagePath: paths.sourceImage
     })
   );
+  await assertSemanticIdentityMatchesReference(request, paths.sourceImage, plan);
   const lua = generateAsepriteLua(plan, {
     asepriteFile: paths.asepriteFile,
     pngFile: paths.asepritePng
@@ -74,4 +78,3 @@ async function assertDoesNotExist(filePath: string): Promise<void> {
     }
   }
 }
-

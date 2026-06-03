@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { STYLE_PRESETS, type DrawOp, type PixelPlan, type PixelRequest } from './types';
+import { ANIMATION_MODES, SEGMENTATION_MODES, STYLE_PRESETS, type DrawOp, type PixelPlan, type PixelRequest } from './types';
 
 export const MAX_CANVAS_SIZE = 256;
 export const MAX_FRAMES = 64;
-export const MAX_DRAW_OPS = MAX_CANVAS_SIZE * MAX_CANVAS_SIZE * 2;
+export const MAX_DRAW_OPS = MAX_CANVAS_SIZE * MAX_CANVAS_SIZE * 12;
 
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const layerNameSchema = z.string().trim().min(1).max(64).regex(/^[\w .-]+$/);
@@ -14,6 +14,8 @@ export const pixelRequestSchema = z.object({
   targetHeight: z.number().int().min(1).max(MAX_CANVAS_SIZE),
   paletteMax: z.number().int().min(2).max(64),
   stylePreset: z.enum(STYLE_PRESETS),
+  segmentationMode: z.enum(SEGMENTATION_MODES).default('none'),
+  animationMode: z.enum(ANIMATION_MODES).default('single'),
   outputName: z.string().trim().min(1).max(80).regex(/^[\w .-]+$/)
 });
 
@@ -102,12 +104,35 @@ export const pixelPlanSchema = z
       )
       .min(1)
       .max(32),
+    frames: z
+      .array(
+        z.object({
+          index: z.number().int().min(1).max(MAX_FRAMES),
+          durationMs: z.number().int().min(20).max(5000).optional(),
+          label: z.string().trim().min(1).max(64).optional()
+        })
+      )
+      .min(1)
+      .max(MAX_FRAMES)
+      .optional(),
+    animations: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1).max(64),
+          from: z.number().int().min(1).max(MAX_FRAMES),
+          to: z.number().int().min(1).max(MAX_FRAMES),
+          direction: z.string().trim().min(1).max(32).optional()
+        })
+      )
+      .max(32)
+      .optional(),
     drawOps: z.array(drawOpSchema).max(MAX_DRAW_OPS),
     artistNotes: z.array(z.string().trim().min(1).max(280)).max(20)
   })
   .superRefine((plan, ctx) => {
     const paletteColors = new Set(plan.palette.map((color) => color.hex.toLowerCase()));
     const layerNames = new Set(plan.layers.map((layer) => layer.name));
+    const frameIndexes = new Set((plan.frames ?? []).map((frame) => frame.index));
 
     if (paletteColors.size !== plan.palette.length) {
       ctx.addIssue({
@@ -125,9 +150,36 @@ export const pixelPlanSchema = z
       });
     }
 
+    if (plan.frames && frameIndexes.size !== plan.frames.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Frame indexes must be unique.',
+        path: ['frames']
+      });
+    }
+
+    plan.animations?.forEach((animation, index) => {
+      if (animation.from > animation.to) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Animation start frame must be before or equal to end frame.',
+          path: ['animations', index]
+        });
+      }
+
+      if (plan.frames && (!frameIndexes.has(animation.from) || !frameIndexes.has(animation.to))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Animation range must reference declared frames.',
+          path: ['animations', index]
+        });
+      }
+    });
+
     plan.drawOps.forEach((op, index) => {
       validateDrawOpBounds(op, plan, ctx, index);
       validateDrawOpReferences(op, paletteColors, layerNames, ctx, index);
+      validateDrawOpFrameReference(op, frameIndexes, Boolean(plan.frames), ctx, index);
     });
   });
 
@@ -196,6 +248,24 @@ function validateDrawOpReferences(
   }
 }
 
+function validateDrawOpFrameReference(
+  op: DrawOp,
+  frameIndexes: Set<number>,
+  hasDeclaredFrames: boolean,
+  ctx: z.RefinementCtx,
+  index: number
+): void {
+  if (op.op !== 'frame' || !hasDeclaredFrames) return;
+
+  if (!frameIndexes.has(op.index)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Frame switch ${op.index} is not declared.`,
+      path: ['drawOps', index, 'index']
+    });
+  }
+}
+
 export function parsePixelRequest(value: unknown): PixelRequest {
   return pixelRequestSchema.parse(value);
 }
@@ -208,4 +278,3 @@ export function sanitizeOutputName(value: string): string {
   const safe = value.trim().replace(/[^\w .-]+/g, '-').replace(/\s+/g, '-');
   return safe.length > 0 ? safe.slice(0, 80) : `asepilot-${Date.now()}`;
 }
-

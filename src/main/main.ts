@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { runPipeline } from '../core/pipeline';
 import { parsePixelRequest } from '../core/schema';
@@ -128,6 +129,13 @@ function registerIpc(): void {
     const result = await runPipeline({
       request,
       projectsRoot,
+      agentProvider: {
+        providerId: settings.agentProvider,
+        cliCommand: settings.cliCommand,
+        openAiApiKey: settings.openAiApiKey,
+        openAiBaseUrl: settings.openAiBaseUrl,
+        openAiModel: settings.openAiModel
+      },
       asepritePath: settings.asepritePath,
       overwrite: false
     });
@@ -147,15 +155,36 @@ function registerIpc(): void {
   });
 }
 
-function toPipelineView(result: PipelineResult): PipelineResultView {
-  const asepritePngUrl = existsSync(result.asepritePng) ? pathToFileURL(result.asepritePng).toString() : null;
+async function toPipelineView(result: PipelineResult): Promise<PipelineResultView> {
+  const asepritePngUrl = existsSync(result.asepritePng) ? await imageFileToDataUrl(result.asepritePng) : null;
 
   return {
     ...result,
-    previewPngUrl: pathToFileURL(result.previewPng).toString(),
-    referencePreviewUrl: pathToFileURL(result.previewImage).toString(),
+    previewPngUrl: await imageFileToDataUrl(result.previewPng),
+    referencePreviewUrl: await imageFileToDataUrl(result.previewImage),
     asepritePngUrl
   };
+}
+
+async function imageFileToDataUrl(filePath: string): Promise<string> {
+  const buffer = await readFile(filePath);
+  const mimeType = imageMimeType(filePath);
+
+  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}
+
+function imageMimeType(filePath: string): string {
+  switch (extname(filePath).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
+    default:
+      return 'image/png';
+  }
 }
 
 void app.whenReady().then(() => {

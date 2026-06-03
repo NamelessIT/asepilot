@@ -1,10 +1,12 @@
 import {
   AlertTriangle,
+  Bot,
   CheckCircle2,
   ExternalLink,
   FileJson,
   FolderOpen,
   ImagePlus,
+  Layers,
   Loader2,
   Palette,
   Save,
@@ -13,18 +15,45 @@ import {
   Terminal
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { STYLE_PRESETS, type PixelRequest, type StylePreset } from '../core/types';
-import { stylePresetLabels, type AppSettings, type PipelineResultView } from '../shared/api';
+import {
+  AGENT_PROVIDER_IDS,
+  ANIMATION_MODES,
+  SEGMENTATION_MODES,
+  STYLE_PRESETS,
+  type AgentProviderId,
+  type AnimationMode,
+  type PixelRequest,
+  type SegmentationMode,
+  type StylePreset
+} from '../core/types';
+import {
+  agentProviderLabels,
+  animationModeLabels,
+  segmentationModeLabels,
+  stylePresetLabels,
+  type AppSettings,
+  type PipelineResultView
+} from '../shared/api';
 
 const SIZE_PRESETS = [16, 32, 64, 128] as const;
 
 export function App(): ReactElement {
-  const [settings, setSettings] = useState<AppSettings>({ asepritePath: '', outputRoot: '' });
+  const [settings, setSettings] = useState<AppSettings>({
+    agentProvider: 'local',
+    asepritePath: '',
+    cliCommand: 'codex exec --skip-git-repo-check --ephemeral --ignore-rules --sandbox read-only --image "{imagePath}" -',
+    openAiApiKey: '',
+    openAiBaseUrl: 'https://api.openai.com/v1',
+    openAiModel: 'gpt-4.1',
+    outputRoot: ''
+  });
   const [imagePath, setImagePath] = useState('');
   const [targetWidth, setTargetWidth] = useState(32);
   const [targetHeight, setTargetHeight] = useState(32);
   const [paletteMax, setPaletteMax] = useState(16);
   const [stylePreset, setStylePreset] = useState<StylePreset>('rpg-item');
+  const [segmentationMode, setSegmentationMode] = useState<SegmentationMode>('none');
+  const [animationMode, setAnimationMode] = useState<AnimationMode>('single');
   const [outputName, setOutputName] = useState('sprite');
   const [result, setResult] = useState<PipelineResultView | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -40,7 +69,9 @@ export function App(): ReactElement {
       });
   }, []);
 
-  const canGenerate = imagePath.trim().length > 0 && outputName.trim().length > 0 && !isRunning;
+  const semanticTopdownRequested = requiresAiTopdown(stylePreset, animationMode);
+  const localSemanticTopdownBlocked = settings.agentProvider === 'local' && semanticTopdownRequested;
+  const canGenerate = imagePath.trim().length > 0 && outputName.trim().length > 0 && !isRunning && !localSemanticTopdownBlocked;
   const asepriteStatus = useMemo(() => {
     if (!result) return null;
     if (result.aseprite.status === 'success') return 'Aseprite export finished';
@@ -95,12 +126,19 @@ export function App(): ReactElement {
   }
 
   async function handleGenerate(): Promise<void> {
+    if (localSemanticTopdownBlocked) {
+      setError('Top-down 4 huong/walk can AI provider de ve lai huong trai/phai/up. Local chi co the rotate/transform anh goc.');
+      return;
+    }
+
     const request: PixelRequest = {
       imagePath,
       targetWidth,
       targetHeight,
       paletteMax,
       stylePreset,
+      segmentationMode,
+      animationMode,
       outputName
     };
 
@@ -109,6 +147,8 @@ export function App(): ReactElement {
     setResult(null);
 
     try {
+      const savedSettings = await window.asepilot.saveSettings(settings);
+      setSettings(savedSettings);
       const nextResult = await window.asepilot.runPipeline(request);
       setResult(nextResult);
     } catch (unknownError) {
@@ -121,6 +161,17 @@ export function App(): ReactElement {
   function setSquareSize(size: number): void {
     setTargetWidth(size);
     setTargetHeight(size);
+  }
+
+  function setAgentProvider(provider: AgentProviderId): void {
+    setSettings({
+      ...settings,
+      agentProvider: provider
+    });
+
+    if (provider === 'local' && segmentationMode === 'ai-model') {
+      setSegmentationMode('auto-local');
+    }
   }
 
   return (
@@ -214,9 +265,118 @@ export function App(): ReactElement {
               ))}
             </select>
             <label>
+              Animation
+              <select onChange={(event) => setAnimationMode(event.target.value as AnimationMode)} value={animationMode}>
+                {ANIMATION_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {animationModeLabels[mode]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {localSemanticTopdownBlocked ? (
+              <div className="hint-box warning">
+                <AlertTriangle size={17} />
+                <span>Top-down semantic can AI provider. Local chi rotate/transform, khong ve lai mat trai/phai/up.</span>
+              </div>
+            ) : null}
+            <label>
               Output
               <input onChange={(event) => setOutputName(event.target.value)} type="text" value={outputName} />
             </label>
+          </section>
+
+          <section className="control-section">
+            <div className="section-title">
+              <Layers size={18} />
+              <h2>Layer Split</h2>
+            </div>
+            <select onChange={(event) => setSegmentationMode(event.target.value as SegmentationMode)} value={segmentationMode}>
+              {SEGMENTATION_MODES.map((mode) => (
+                <option disabled={mode === 'ai-model' && settings.agentProvider === 'local'} key={mode} value={mode}>
+                  {segmentationModeLabels[mode]}
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <section className="control-section">
+            <div className="section-title">
+              <Bot size={18} />
+              <h2>Agent</h2>
+            </div>
+            <select onChange={(event) => setAgentProvider(event.target.value as AgentProviderId)} value={settings.agentProvider}>
+              {AGENT_PROVIDER_IDS.map((provider) => (
+                <option key={provider} value={provider}>
+                  {agentProviderLabels[provider]}
+                </option>
+              ))}
+            </select>
+            {settings.agentProvider === 'openai-compatible' ? (
+              <>
+                <label>
+                  Model
+                  <input
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        openAiModel: event.target.value
+                      })
+                    }
+                    type="text"
+                    value={settings.openAiModel}
+                  />
+                </label>
+                <label>
+                  Base URL
+                  <input
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        openAiBaseUrl: event.target.value
+                      })
+                    }
+                    type="text"
+                    value={settings.openAiBaseUrl}
+                  />
+                </label>
+                <label>
+                  API Key
+                  <input
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        openAiApiKey: event.target.value
+                      })
+                    }
+                    type="password"
+                    value={settings.openAiApiKey}
+                  />
+                </label>
+              </>
+            ) : null}
+            {settings.agentProvider === 'cli-json' ? (
+              <label>
+                Command
+                <input
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      cliCommand: event.target.value
+                    })
+                  }
+                  placeholder='codex exec --skip-git-repo-check --ephemeral --ignore-rules --sandbox read-only --image "{imagePath}" -'
+                  type="text"
+                  value={settings.cliCommand}
+                />
+              </label>
+            ) : null}
+            {semanticTopdownRequested && settings.agentProvider !== 'local' ? (
+              <div className="hint-box info">
+                <Sparkles size={17} />
+                <span>AI se redraw down/left/right/up semantic, khong rotate/flip/copy. CLI co the mat 2-5 phut.</span>
+              </div>
+            ) : null}
           </section>
 
           <section className="control-section">
@@ -311,7 +471,12 @@ export function App(): ReactElement {
           {result ? (
             <div className="result-layout">
               <div className="image-stage">
-                <img alt="Generated pixel art preview" src={result.previewPngUrl} />
+                <img
+                  alt="Generated pixel art preview"
+                  key={result.previewPng}
+                  onError={() => setError(`Preview exists but could not be displayed: ${result.previewPng}`)}
+                  src={result.previewPngUrl}
+                />
               </div>
               <div className="result-sidebar">
                 <div className={`status-box ${result.aseprite.status}`}>
@@ -374,4 +539,8 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
   return 'Unexpected error';
+}
+
+function requiresAiTopdown(stylePreset: StylePreset, animationMode: AnimationMode): boolean {
+  return stylePreset === 'top-down-character' && (animationMode === 'topdown-4dir' || animationMode === 'topdown-walk-8');
 }

@@ -5,9 +5,12 @@ import type { DrawOp, PixelPlan } from './types';
 export async function renderPlanToPng(plan: PixelPlan, outputPath: string): Promise<void> {
   const width = plan.canvas.width;
   const height = plan.canvas.height;
-  const pixels = new Uint8ClampedArray(width * height * 4);
+  const frameIndexes = collectFrameIndexes(plan);
+  const framePixels = new Map<number, Uint8ClampedArray>();
   const declaredLayers = new Set(plan.layers.map((layer) => layer.name));
+  const visibleLayers = new Set(plan.layers.filter((layer) => layer.visible !== false).map((layer) => layer.name));
   let currentLayer = plan.layers[0]?.name ?? 'Base';
+  let currentFrame = frameIndexes[0] ?? 1;
 
   for (const op of plan.drawOps) {
     if (op.op === 'layer') {
@@ -16,24 +19,76 @@ export async function renderPlanToPng(plan: PixelPlan, outputPath: string): Prom
     }
 
     if (op.op === 'frame') {
+      currentFrame = op.index;
       continue;
     }
 
     const layer = 'layer' in op && op.layer ? op.layer : currentLayer;
-    if (!declaredLayers.has(layer)) continue;
+    if (!declaredLayers.has(layer) || !visibleLayers.has(layer)) continue;
 
+    const pixels = framePixels.get(currentFrame) ?? new Uint8ClampedArray(width * height * 4);
+    framePixels.set(currentFrame, pixels);
     drawOp(pixels, width, height, op);
   }
 
-  await sharp(Buffer.from(pixels), {
+  const output = frameIndexes.length <= 1 ? (framePixels.get(frameIndexes[0] ?? 1) ?? new Uint8ClampedArray(width * height * 4)) : buildFrameStrip(frameIndexes, framePixels, width, height);
+  const outputWidth = frameIndexes.length <= 1 ? width : width * frameIndexes.length;
+
+  await sharp(Buffer.from(output), {
     raw: {
-      width,
+      width: outputWidth,
       height,
       channels: 4
     }
   })
     .png()
     .toFile(outputPath);
+}
+
+function collectFrameIndexes(plan: PixelPlan): number[] {
+  const indexes = new Set<number>();
+
+  for (const frame of plan.frames ?? []) {
+    indexes.add(frame.index);
+  }
+
+  for (const op of plan.drawOps) {
+    if (op.op === 'frame') {
+      indexes.add(op.index);
+    }
+  }
+
+  if (indexes.size === 0) indexes.add(1);
+
+  return [...indexes].sort((left, right) => left - right);
+}
+
+function buildFrameStrip(
+  frameIndexes: number[],
+  framePixels: Map<number, Uint8ClampedArray>,
+  width: number,
+  height: number
+): Uint8ClampedArray {
+  const atlas = new Uint8ClampedArray(width * frameIndexes.length * height * 4);
+
+  frameIndexes.forEach((frameIndex, frameOffset) => {
+    const pixels = framePixels.get(frameIndex) ?? new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const sourceOffset = (y * width + x) * 4;
+        const targetX = frameOffset * width + x;
+        const targetOffset = (y * width * frameIndexes.length + targetX) * 4;
+
+        atlas[targetOffset] = pixels[sourceOffset] ?? 0;
+        atlas[targetOffset + 1] = pixels[sourceOffset + 1] ?? 0;
+        atlas[targetOffset + 2] = pixels[sourceOffset + 2] ?? 0;
+        atlas[targetOffset + 3] = pixels[sourceOffset + 3] ?? 0;
+      }
+    }
+  });
+
+  return atlas;
 }
 
 function drawOp(pixels: Uint8ClampedArray, width: number, height: number, op: Exclude<DrawOp, { op: 'layer' | 'frame' }>): void {
@@ -158,4 +213,3 @@ function drawEllipse(
     }
   }
 }
-
