@@ -1,3 +1,4 @@
+import { extname } from 'node:path';
 import { buildPixelPlanPrompt, imageToDataUrl, parseAgentPlanOutput } from './agentJson';
 import type { AgentProvider } from './agentProvider';
 import type { PixelPlan, PixelRequest } from '../types';
@@ -19,6 +20,18 @@ interface ChatCompletionResponse {
   };
 }
 
+type ChatContentPart =
+  | {
+      type: 'text';
+      text: string;
+    }
+  | {
+      type: 'image_url';
+      image_url: {
+        url: string;
+      };
+    };
+
 export class OpenAICompatibleProvider implements AgentProvider {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -35,7 +48,7 @@ export class OpenAICompatibleProvider implements AgentProvider {
       throw new Error('OpenAI-compatible provider is selected but no API key is configured.');
     }
 
-    const imageUrl = await imageToDataUrl(request.imagePath);
+    const requestContent = await buildUserContent(request, buildPixelPlanPrompt(request));
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -54,18 +67,7 @@ export class OpenAICompatibleProvider implements AgentProvider {
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: buildPixelPlanPrompt(request)
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageUrl
-                }
-              }
-            ]
+            content: requestContent
           }
         ]
       })
@@ -89,7 +91,10 @@ export class OpenAICompatibleProvider implements AgentProvider {
       throw new Error('OpenAI-compatible provider is selected but no API key is configured.');
     }
 
-    const imageUrl = await imageToDataUrl(request.imagePath);
+    const requestContent = await buildUserContent(
+      request,
+      buildPixelPlanPrompt(request, `Revise this previous plan using feedback: ${feedback}\nPrevious plan JSON: ${JSON.stringify(previousPlan)}`)
+    );
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -108,18 +113,7 @@ export class OpenAICompatibleProvider implements AgentProvider {
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: buildPixelPlanPrompt(request, `Revise this previous plan using feedback: ${feedback}\nPrevious plan JSON: ${JSON.stringify(previousPlan)}`)
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageUrl
-                }
-              }
-            ]
+            content: requestContent
           }
         ]
       })
@@ -137,4 +131,35 @@ export class OpenAICompatibleProvider implements AgentProvider {
 
     return parseAgentPlanOutput(content);
   }
+}
+
+async function buildUserContent(request: PixelRequest, text: string): Promise<ChatContentPart[]> {
+  const content: ChatContentPart[] = [
+    {
+      type: 'text',
+      text
+    },
+    {
+      type: 'image_url',
+      image_url: {
+        url: await imageToDataUrl(request.imagePath)
+      }
+    }
+  ];
+  const templatePath = request.animationTemplatePath?.trim();
+
+  if (templatePath && isImageFile(templatePath)) {
+    content.push({
+      type: 'image_url',
+      image_url: {
+        url: await imageToDataUrl(templatePath)
+      }
+    });
+  }
+
+  return content;
+}
+
+function isImageFile(filePath: string): boolean {
+  return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(extname(filePath).toLowerCase());
 }

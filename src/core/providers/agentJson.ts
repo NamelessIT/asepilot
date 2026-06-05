@@ -6,23 +6,8 @@ import type { PixelPlan, PixelRequest } from '../types';
 
 export function buildPixelPlanPrompt(request: PixelRequest, extra?: string): string {
   const drawOpBudget = estimateDrawOpBudget(request);
-  const semanticTopdownInstructions = requiresSemanticTopdown(request)
-    ? [
-        'Semantic top-down turnaround requirement:',
-        '- Treat the reference as the DOWN-facing/front-facing sprite only.',
-        '- Infer and redraw LEFT, RIGHT, and UP/back views as a game sprite artist would.',
-        '- Do not create direction frames by rotating, mirroring, shifting, or copying the down frame.',
-        '- LEFT and RIGHT must be profile/side views with the subject facing horizontally.',
-        '- UP must show the back view; hide or reduce front-facing facial/eye/mouth details that would not be visible from behind.',
-        '- Preserve identity: silhouette language, colors, horns/antennae/ears/weapons, scale, and material clusters should remain recognizable.',
-        '- Keep each frame centered, same canvas size, same palette, and consistent feet/contact shadow position.',
-        '- Use frame labels exactly Down, Left, Right, Up for topdown-4dir.',
-        '- For topdown-walk-8, use labels Down Walk 1, Down Walk 2, Left Walk 1, Left Walk 2, Right Walk 1, Right Walk 2, Up Walk 1, Up Walk 2.',
-        '- If the source is an animal, monster, bug, or creature, redraw anatomy per direction rather than rotating the entire body.',
-        '- Keep the plan compact: draw a readable sprite using clustered primitives, not exhaustive per-pixel raster data.',
-        `- Hard budget: keep total drawOps under ${drawOpBudget}. Use fillRect/rect/line/ellipse for clusters and outlines.`
-      ]
-    : [];
+  const semanticTopdownInstructions = buildSemanticAnimationInstructions(request, drawOpBudget);
+  const templateInstructions = buildTemplateInstructions(request);
 
   return [
     'This is an image-to-pixel-art planning task, not a software engineering task.',
@@ -51,7 +36,10 @@ export function buildPixelPlanPrompt(request: PixelRequest, extra?: string): str
     'If the reference is already pixel art, keep the same chunky pixel cluster language, proportions, silhouette, and hue family.',
     'If animationMode is topdown-4dir, create frames for down, left, right, up.',
     'If animationMode is topdown-walk-8, create eight frames: down1, down2, left1, left2, right1, right2, up1, up2.',
+    'If animationMode is topdown-idle-4dir, create 16 frames: four idle frames for each of down, left, right, and up.',
+    'If animationMode is topdown-rpg-full-4dir, create a full RPG character sheet for down, left, right, and up with idle, walk, attack01, attack02, hurt, and death animations.',
     ...semanticTopdownInstructions,
+    ...templateInstructions,
     'For top-down characters, simplify the source into a readable sprite instead of just shrinking the image.',
     'For item/icon styles, separate the object from glow/background when possible.',
     extra ? `Additional instruction: ${extra}` : ''
@@ -63,8 +51,70 @@ export function buildPixelPlanPrompt(request: PixelRequest, extra?: string): str
 export function requiresSemanticTopdown(request: Pick<PixelRequest, 'animationMode' | 'stylePreset'>): boolean {
   return (
     request.stylePreset === 'top-down-character' &&
-    (request.animationMode === 'topdown-4dir' || request.animationMode === 'topdown-walk-8')
+    ['topdown-4dir', 'topdown-walk-8', 'topdown-idle-4dir', 'topdown-rpg-full-4dir'].includes(request.animationMode)
   );
+}
+
+function buildSemanticAnimationInstructions(request: PixelRequest, drawOpBudget: number): string[] {
+  if (!requiresSemanticTopdown(request)) return [];
+
+  return [
+    'Semantic top-down turnaround requirement:',
+    '- Treat the reference as the DOWN-facing/front-facing sprite only unless the user/template clearly says another source direction.',
+    '- Infer and redraw LEFT, RIGHT, and UP/back views as a game sprite artist would.',
+    '- Do not create direction frames by rotating, mirroring, shifting, or copying the down frame.',
+    '- LEFT and RIGHT must be profile/side views with the subject facing horizontally.',
+    '- UP must show the back view; hide or reduce front-facing facial/eye/mouth details that would not be visible from behind.',
+    '- Preserve identity: silhouette language, colors, horns/antennae/ears/weapons, scale, and material clusters should remain recognizable.',
+    '- Keep each frame centered, same canvas size, same palette, and consistent feet/contact shadow position.',
+    '- If the source is an animal, monster, bug, or creature, redraw anatomy per direction rather than rotating the entire body.',
+    '- Animation changes must be pose changes: idle breathing/bob, walk limb offsets, attack anticipation/swing/recover, hurt recoil, death collapse/fade.',
+    '- Keep the plan compact: draw a readable sprite using clustered primitives, not exhaustive per-pixel raster data.',
+    `- Hard budget: keep total drawOps under ${drawOpBudget}. Use fillRect/rect/line/ellipse for clusters and outlines.`,
+    ...semanticFrameOrderInstructions(request)
+  ];
+}
+
+function semanticFrameOrderInstructions(request: Pick<PixelRequest, 'animationMode'>): string[] {
+  switch (request.animationMode) {
+    case 'topdown-4dir':
+      return ['- Use frame labels exactly Down, Left, Right, Up.'];
+    case 'topdown-walk-8':
+      return [
+        '- Use frame labels exactly Down Walk 1, Down Walk 2, Left Walk 1, Left Walk 2, Right Walk 1, Right Walk 2, Up Walk 1, Up Walk 2.',
+        '- Use animations named walk-down, walk-left, walk-right, walk-up.'
+      ];
+    case 'topdown-idle-4dir':
+      return [
+        '- Frame order: Down Idle 1-4, Left Idle 1-4, Right Idle 1-4, Up Idle 1-4.',
+        '- Use animations named idle-down, idle-left, idle-right, idle-up.'
+      ];
+    case 'topdown-rpg-full-4dir':
+      return [
+        '- Frame order has four direction blocks: Down, Left, Right, Up.',
+        '- Each direction block has 34 frames in this exact order: idle 1-6, walk 1-8, attack01 1-6, attack02 1-6, hurt 1-4, death 1-4.',
+        '- Total frame count must be 136.',
+        '- Label frames as "<Direction> <animation> <number>", for example "Down idle 1" or "Left attack01 3".',
+        '- Use animation names like down-idle, down-walk, down-attack01, down-attack02, down-hurt, down-death, then repeat for left/right/up.',
+        '- If the requested canvas is small or the subject is complex, simplify each frame but keep the same character identity.'
+      ];
+    default:
+      return [];
+  }
+}
+
+function buildTemplateInstructions(request: PixelRequest): string[] {
+  const templatePath = request.animationTemplatePath?.trim();
+  if (!templatePath) return [];
+
+  return [
+    'Animation template reference:',
+    `- Template path: ${templatePath}.`,
+    '- Use the template only for layer names, frame rhythm, animation tags, silhouette scale, and top-down RPG readability.',
+    '- Do not copy the template character identity, colors, weapon, armor, or species unless those appear in the reference image.',
+    '- The reference image remains the identity source of truth.',
+    '- Good default editable layers: Shadow, Character Base, Outline, Effect, Edits.'
+  ];
 }
 
 function estimateDrawOpBudget(request: Pick<PixelRequest, 'animationMode' | 'stylePreset' | 'targetWidth' | 'targetHeight'>): number {
@@ -72,11 +122,19 @@ function estimateDrawOpBudget(request: Pick<PixelRequest, 'animationMode' | 'sty
     return Math.max(350, Math.min(2400, Math.round((request.targetWidth * request.targetHeight) / 6)));
   }
 
-  const frameCount = request.animationMode === 'topdown-walk-8' ? 8 : 4;
+  const frameCount =
+    request.animationMode === 'topdown-rpg-full-4dir'
+      ? 136
+      : request.animationMode === 'topdown-idle-4dir'
+        ? 16
+        : request.animationMode === 'topdown-walk-8'
+          ? 8
+          : 4;
   const frameArea = request.targetWidth * request.targetHeight;
-  const perFrameBudget = frameArea <= 4096 ? 170 : frameArea <= 16384 ? 280 : 420;
+  const perFrameBudget =
+    request.animationMode === 'topdown-rpg-full-4dir' ? 44 : frameArea <= 4096 ? 170 : frameArea <= 16384 ? 280 : 420;
 
-  return frameCount * perFrameBudget;
+  return Math.min(8_500, frameCount * perFrameBudget);
 }
 
 export async function imageToDataUrl(filePath: string): Promise<string> {

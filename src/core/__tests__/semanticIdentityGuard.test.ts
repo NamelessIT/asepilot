@@ -67,7 +67,64 @@ describe('assertSemanticIdentityMatchesReference', () => {
       drawOps: [
         { op: 'frame', index: 1 },
         { op: 'layer', name: 'Character Base' },
-        { op: 'fillRect', layer: 'Character Base', x: 20, y: 20, width: 8, height: 8, color: '#142528' }
+        { op: 'fillRect', layer: 'Character Base', x: 20, y: 20, width: 8, height: 8, color: '#142528' },
+        { op: 'fillRect', layer: 'Character Base', x: 16, y: 16, width: 4, height: 4, color: '#31c96c' }
+      ],
+      artistNotes: ['test']
+    };
+
+    await expect(assertSemanticIdentityMatchesReference(request, reference, plan)).resolves.toBeUndefined();
+  });
+
+  it('rejects turnarounds that replace bright subject accents with background browns', async () => {
+    const reference = await createReferenceImage();
+    const plan: PixelPlan = {
+      canvas: {
+        width: 64,
+        height: 64,
+        transparent: true
+      },
+      palette: [
+        { name: 'ink', hex: '#101010' },
+        { name: 'blueBlack', hex: '#101820' },
+        { name: 'darkBark', hex: '#484038' },
+        { name: 'bodyBrown', hex: '#504040' },
+        { name: 'shellBrown', hex: '#584040' }
+      ],
+      layers: [{ name: 'Character Base' }],
+      frames: [{ index: 1, durationMs: 120, label: 'Down' }],
+      animations: [{ name: 'topdown-4dir', from: 1, to: 1 }],
+      drawOps: [
+        { op: 'frame', index: 1 },
+        { op: 'layer', name: 'Character Base' },
+        { op: 'fillRect', layer: 'Character Base', x: 20, y: 20, width: 8, height: 8, color: '#504040' },
+        { op: 'fillRect', layer: 'Character Base', x: 28, y: 18, width: 4, height: 4, color: '#584040' }
+      ],
+      artistNotes: ['test']
+    };
+
+    await expect(assertSemanticIdentityMatchesReference(request, reference, plan)).rejects.toThrow(/vivid subject accent/i);
+  });
+
+  it('does not require neutral transparent sprites to preserve fake background accents', async () => {
+    const reference = await createTransparentNeutralReferenceImage();
+    const plan: PixelPlan = {
+      canvas: {
+        width: 64,
+        height: 64,
+        transparent: true
+      },
+      palette: [
+        { name: 'ink', hex: '#101820' },
+        { name: 'body', hex: '#243038' }
+      ],
+      layers: [{ name: 'Character Base' }],
+      frames: [{ index: 1, durationMs: 120, label: 'Down' }],
+      animations: [{ name: 'topdown-4dir', from: 1, to: 1 }],
+      drawOps: [
+        { op: 'frame', index: 1 },
+        { op: 'layer', name: 'Character Base' },
+        { op: 'fillRect', layer: 'Character Base', x: 20, y: 20, width: 8, height: 8, color: '#243038' }
       ],
       artistNotes: ['test']
     };
@@ -116,6 +173,40 @@ async function createReferenceImage(): Promise<string> {
           .toBuffer(),
         left: 4,
         top: 5
+      }
+    ])
+    .png()
+    .toFile(reference);
+
+  return reference;
+}
+
+async function createTransparentNeutralReferenceImage(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'asepilot-identity-'));
+  const reference = join(directory, 'transparent-reference.png');
+
+  await sharp({
+    create: {
+      width: 32,
+      height: 32,
+      channels: 4,
+      background: '#00000000'
+    }
+  })
+    .composite([
+      {
+        input: await sharp({
+          create: {
+            width: 12,
+            height: 16,
+            channels: 4,
+            background: '#243038ff'
+          }
+        })
+          .png()
+          .toBuffer(),
+        left: 10,
+        top: 8
       }
     ])
     .png()

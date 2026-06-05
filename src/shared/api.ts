@@ -21,6 +21,7 @@ export interface AsePilotApi {
   saveSettings(settings: AppSettings): Promise<AppSettings>;
   selectImage(): Promise<string | null>;
   selectAseprite(): Promise<string | null>;
+  selectAnimationTemplate(): Promise<string | null>;
   selectOutputFolder(): Promise<string | null>;
   runPipeline(request: PixelRequest): Promise<PipelineResultView>;
   revealPath(path: string): Promise<void>;
@@ -42,6 +43,8 @@ export const animationModeLabels: Record<AnimationMode, string> = {
   'idle-4frame': 'Idle - 4 frames',
   'topdown-4dir': 'Top-down 4 huong - AI semantic',
   'topdown-walk-8': 'Top-down walk - AI semantic',
+  'topdown-idle-4dir': 'Top-down idle 4 huong - AI',
+  'topdown-rpg-full-4dir': 'RPG full 4 huong - AI',
   'item-shine-4frame': 'Item shine - 4 frames'
 };
 

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ANIMATION_MODES, SEGMENTATION_MODES, STYLE_PRESETS, type DrawOp, type PixelPlan, type PixelRequest } from './types';
 
 export const MAX_CANVAS_SIZE = 256;
-export const MAX_FRAMES = 64;
+export const MAX_FRAMES = 160;
 export const MAX_DRAW_OPS = MAX_CANVAS_SIZE * MAX_CANVAS_SIZE * 12;
 
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -10,6 +10,11 @@ const layerNameSchema = z.string().trim().min(1).max(64).regex(/^[\w .-]+$/);
 
 export const pixelRequestSchema = z.object({
   imagePath: z.string().trim().min(1),
+  animationTemplatePath: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
   targetWidth: z.number().int().min(1).max(MAX_CANVAS_SIZE),
   targetHeight: z.number().int().min(1).max(MAX_CANVAS_SIZE),
   paletteMax: z.number().int().min(2).max(64),

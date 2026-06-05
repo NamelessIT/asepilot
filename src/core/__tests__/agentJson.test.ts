@@ -18,7 +18,7 @@ describe('buildPixelPlanPrompt', () => {
     const prompt = buildPixelPlanPrompt(baseRequest);
 
     expect(requiresSemanticTopdown(baseRequest)).toBe(true);
-    expect(prompt).toContain('Treat the reference as the DOWN-facing/front-facing sprite only.');
+    expect(prompt).toContain('Treat the reference as the DOWN-facing/front-facing sprite only');
     expect(prompt).toContain('Do not create direction frames by rotating, mirroring, shifting, or copying the down frame.');
     expect(prompt).toContain('UP must show the back view');
     expect(prompt).toContain('Hard budget: keep total drawOps under');
@@ -37,6 +37,19 @@ describe('buildPixelPlanPrompt', () => {
       })
     ).toBe(false);
     expect(prompt).not.toContain('Do not create direction frames by rotating, mirroring, shifting, or copying the down frame.');
+  });
+
+  it('describes the RPG full four-direction frame order and optional animation template', () => {
+    const prompt = buildPixelPlanPrompt({
+      ...baseRequest,
+      animationMode: 'topdown-rpg-full-4dir',
+      animationTemplatePath: 'C:\\Assets\\Orc.aseprite'
+    });
+
+    expect(prompt).toContain('Total frame count must be 136.');
+    expect(prompt).toContain('idle 1-6, walk 1-8, attack01 1-6, attack02 1-6, hurt 1-4, death 1-4');
+    expect(prompt).toContain('Template path: C:\\Assets\\Orc.aseprite');
+    expect(prompt).toContain('The reference image remains the identity source of truth.');
   });
 
   it('normalizes common agent draw op coordinate aliases before validation', () => {

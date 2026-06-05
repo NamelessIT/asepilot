@@ -312,6 +312,8 @@ function buildAnimationPlan(input: AnimationPlanInput): AnimationPlanOutput {
     note:
       input.animationMode === 'topdown-4dir' || input.animationMode === 'topdown-walk-8'
         ? 'Local provider generated geometric top-down direction frames from one view; use an AI provider for real semantic turnarounds with redrawn body parts.'
+        : input.animationMode === 'topdown-idle-4dir' || input.animationMode === 'topdown-rpg-full-4dir'
+          ? 'Local provider generated a geometric RPG animation scaffold only. Use an AI provider plus a template for real redrawn direction and action frames.'
         : 'Local provider generated lightweight animation frames by transforming the validated layer plan.'
   };
 }
@@ -347,6 +349,10 @@ function animationTransforms(animationMode: AnimationMode, stylePreset: StylePre
         { index: 7, label: 'Up Walk 1', direction: 'up', durationMs, dx: -step, dy: 0, rotation: 180 },
         { index: 8, label: 'Up Walk 2', direction: 'up', durationMs, dx: step, dy: 0, rotation: 180 }
       ];
+    case 'topdown-idle-4dir':
+      return buildDirectionalIdleTransforms(durationMs, bob);
+    case 'topdown-rpg-full-4dir':
+      return buildRpgFullTransforms(durationMs, bob, step);
     case 'item-shine-4frame':
       return [
         { index: 1, label: 'Item Shine 1', durationMs, dx: 0, dy: 0 },
@@ -360,6 +366,15 @@ function animationTransforms(animationMode: AnimationMode, stylePreset: StylePre
 }
 
 function buildAnimationMetadata(animationMode: AnimationMode, transforms: FrameTransform[]): PixelAnimation[] {
+  if (animationMode === 'topdown-idle-4dir') {
+    return [
+      { name: 'idle-down', from: 1, to: 4, direction: 'down' },
+      { name: 'idle-left', from: 5, to: 8, direction: 'left' },
+      { name: 'idle-right', from: 9, to: 12, direction: 'right' },
+      { name: 'idle-up', from: 13, to: 16, direction: 'up' }
+    ];
+  }
+
   if (animationMode === 'topdown-walk-8') {
     return [
       { name: 'walk-down', from: 1, to: 2, direction: 'down' },
@@ -369,6 +384,10 @@ function buildAnimationMetadata(animationMode: AnimationMode, transforms: FrameT
     ];
   }
 
+  if (animationMode === 'topdown-rpg-full-4dir') {
+    return buildRpgFullAnimationMetadata();
+  }
+
   return [
     {
       name: animationMode,
@@ -376,6 +395,156 @@ function buildAnimationMetadata(animationMode: AnimationMode, transforms: FrameT
       to: transforms[transforms.length - 1]?.index ?? 1
     }
   ];
+}
+
+function buildDirectionalIdleTransforms(durationMs: number, bob: number): FrameTransform[] {
+  const directions = directionalTransformBases();
+  const idleOffsets = [
+    { suffix: 'Idle 1', dx: 0, dy: 0 },
+    { suffix: 'Idle 2', dx: 0, dy: -Math.max(1, bob - 1) },
+    { suffix: 'Idle 3', dx: 0, dy: -bob },
+    { suffix: 'Idle 4', dx: 0, dy: 1 }
+  ];
+  const transforms: FrameTransform[] = [];
+
+  for (const direction of directions) {
+    for (const offset of idleOffsets) {
+      transforms.push({
+        index: transforms.length + 1,
+        label: `${direction.label} ${offset.suffix}`,
+        direction: direction.name,
+        durationMs,
+        dx: offset.dx,
+        dy: offset.dy,
+        rotation: direction.rotation
+      });
+    }
+  }
+
+  return transforms;
+}
+
+function buildRpgFullTransforms(durationMs: number, bob: number, step: number): FrameTransform[] {
+  const transforms: FrameTransform[] = [];
+
+  for (const direction of directionalTransformBases()) {
+    const poseOffsets = [
+      ...repeatPose('idle', 6, [
+        [0, 0],
+        [0, -Math.max(1, bob - 1)],
+        [0, -bob],
+        [0, -Math.max(1, bob - 1)],
+        [0, 0],
+        [0, 1]
+      ]),
+      ...repeatPose('walk', 8, [
+        [-step, 0],
+        [step, 0],
+        [-step, -1],
+        [step, -1],
+        [-step, 1],
+        [step, 1],
+        [0, 0],
+        [0, -1]
+      ]),
+      ...repeatPose('attack01', 6, [
+        [0, 0],
+        [direction.xStep * step, 0],
+        [direction.xStep * (step + 1), -1],
+        [direction.xStep * (step + 1), 0],
+        [direction.xStep * step, 1],
+        [0, 0]
+      ]),
+      ...repeatPose('attack02', 6, [
+        [0, 0],
+        [direction.xStep * step, -1],
+        [direction.xStep * (step + 2), 0],
+        [direction.xStep * (step + 1), 1],
+        [direction.xStep * step, 0],
+        [0, 0]
+      ]),
+      ...repeatPose('hurt', 4, [
+        [-direction.xStep * step, 1],
+        [-direction.xStep * step, 0],
+        [0, 1],
+        [0, 0]
+      ]),
+      ...repeatPose('death', 4, [
+        [0, 1],
+        [0, 2],
+        [0, 3],
+        [0, 4]
+      ])
+    ];
+
+    for (const pose of poseOffsets) {
+      transforms.push({
+        index: transforms.length + 1,
+        label: `${direction.label} ${pose.name} ${pose.number}`,
+        direction: direction.name,
+        durationMs,
+        dx: pose.dx,
+        dy: pose.dy,
+        rotation: direction.rotation
+      });
+    }
+  }
+
+  return transforms;
+}
+
+function directionalTransformBases(): Array<{ label: string; name: string; rotation: 0 | 90 | 180 | 270; xStep: number }> {
+  return [
+    { label: 'Down', name: 'down', rotation: 0, xStep: 0 },
+    { label: 'Left', name: 'left', rotation: 90, xStep: -1 },
+    { label: 'Right', name: 'right', rotation: 270, xStep: 1 },
+    { label: 'Up', name: 'up', rotation: 180, xStep: 0 }
+  ];
+}
+
+function repeatPose(name: string, count: number, offsets: Array<[number, number]>): Array<{ name: string; number: number; dx: number; dy: number }> {
+  return Array.from({ length: count }, (_, index) => {
+    const [dx, dy] = offsets[index] ?? [0, 0];
+
+    return {
+      name,
+      number: index + 1,
+      dx,
+      dy
+    };
+  });
+}
+
+function buildRpgFullAnimationMetadata(): PixelAnimation[] {
+  const animations: PixelAnimation[] = [];
+  const blocks = [
+    { direction: 'down', start: 1 },
+    { direction: 'left', start: 35 },
+    { direction: 'right', start: 69 },
+    { direction: 'up', start: 103 }
+  ];
+  const ranges = [
+    { name: 'idle', offset: 0, length: 6 },
+    { name: 'walk', offset: 6, length: 8 },
+    { name: 'attack01', offset: 14, length: 6 },
+    { name: 'attack02', offset: 20, length: 6 },
+    { name: 'hurt', offset: 26, length: 4 },
+    { name: 'death', offset: 30, length: 4 }
+  ];
+
+  for (const block of blocks) {
+    for (const range of ranges) {
+      const from = block.start + range.offset;
+      animations.push({
+        name: `${block.direction}-${range.name}`,
+        from,
+        to: from + range.length - 1,
+        direction: block.direction
+      });
+    }
+  }
+
+  return animations;
 }
 
 function buildFrameOps({

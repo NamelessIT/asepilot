@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron';
 import { runPipeline } from '../core/pipeline';
 import { parsePixelRequest } from '../core/schema';
 import { readSettings, writeSettingsFile } from './settings';
@@ -104,6 +104,26 @@ function registerIpc(): void {
             }
           ]
         });
+
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+
+  ipcMain.handle('asepilot:select-animation-template', async (): Promise<string | null> => {
+    const dialogOptions: OpenDialogOptions = {
+      title: 'Select animation template',
+      properties: ['openFile'],
+      filters: [
+        {
+          name: 'Aseprite or image templates',
+          extensions: ['aseprite', 'ase', 'png', 'jpg', 'jpeg', 'webp']
+        },
+        {
+          name: 'All files',
+          extensions: ['*']
+        }
+      ]
+    };
+    const result = mainWindow ? await dialog.showOpenDialog(mainWindow, dialogOptions) : await dialog.showOpenDialog(dialogOptions);
 
     return result.canceled ? null : result.filePaths[0] ?? null;
   });

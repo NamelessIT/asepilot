@@ -54,6 +54,7 @@ export function App(): ReactElement {
   const [stylePreset, setStylePreset] = useState<StylePreset>('rpg-item');
   const [segmentationMode, setSegmentationMode] = useState<SegmentationMode>('none');
   const [animationMode, setAnimationMode] = useState<AnimationMode>('single');
+  const [animationTemplatePath, setAnimationTemplatePath] = useState('');
   const [outputName, setOutputName] = useState('sprite');
   const [result, setResult] = useState<PipelineResultView | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -69,7 +70,7 @@ export function App(): ReactElement {
       });
   }, []);
 
-  const semanticTopdownRequested = requiresAiTopdown(stylePreset, animationMode);
+  const semanticTopdownRequested = requiresSemanticAnimation(stylePreset, animationMode);
   const localSemanticTopdownBlocked = settings.agentProvider === 'local' && semanticTopdownRequested;
   const canGenerate = imagePath.trim().length > 0 && outputName.trim().length > 0 && !isRunning && !localSemanticTopdownBlocked;
   const asepriteStatus = useMemo(() => {
@@ -100,6 +101,15 @@ export function App(): ReactElement {
     setSettings(nextSettings);
   }
 
+  async function handleSelectAnimationTemplate(): Promise<void> {
+    const selected = await window.asepilot.selectAnimationTemplate();
+    if (!selected) return;
+
+    setAnimationTemplatePath(selected);
+    setResult(null);
+    setError(null);
+  }
+
   async function handleSelectOutputFolder(): Promise<void> {
     const selected = await window.asepilot.selectOutputFolder();
     if (!selected) return;
@@ -127,12 +137,13 @@ export function App(): ReactElement {
 
   async function handleGenerate(): Promise<void> {
     if (localSemanticTopdownBlocked) {
-      setError('Top-down 4 huong/walk can AI provider de ve lai huong trai/phai/up. Local chi co the rotate/transform anh goc.');
+      setError('Mode semantic nay can AI provider de ve lai huong/animation. Local chi co the tao scaffold geometric tu anh goc.');
       return;
     }
 
     const request: PixelRequest = {
       imagePath,
+      animationTemplatePath: animationTemplatePath.trim() || undefined,
       targetWidth,
       targetHeight,
       paletteMax,
@@ -277,9 +288,24 @@ export function App(): ReactElement {
             {localSemanticTopdownBlocked ? (
               <div className="hint-box warning">
                 <AlertTriangle size={17} />
-                <span>Top-down semantic can AI provider. Local chi rotate/transform, khong ve lai mat trai/phai/up.</span>
+                <span>Mode nay can AI provider. Local chi tao pixel editable, khong the ve lai huong/animation semantic.</span>
               </div>
             ) : null}
+            <div className="template-row">
+              <button className="secondary-action" onClick={() => void handleSelectAnimationTemplate()} type="button">
+                <FolderOpen size={17} />
+                Template
+              </button>
+              <button
+                className="secondary-action compact"
+                disabled={!animationTemplatePath}
+                onClick={() => setAnimationTemplatePath('')}
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
+            <PathLine value={animationTemplatePath || 'No animation template selected'} />
             <label>
               Output
               <input onChange={(event) => setOutputName(event.target.value)} type="text" value={outputName} />
@@ -374,7 +400,7 @@ export function App(): ReactElement {
             {semanticTopdownRequested && settings.agentProvider !== 'local' ? (
               <div className="hint-box info">
                 <Sparkles size={17} />
-                <span>AI se redraw down/left/right/up semantic, khong rotate/flip/copy. CLI co the mat 2-5 phut.</span>
+                <span>AI se redraw huong/animation semantic, khong rotate/flip/copy. CLI co the mat vai phut.</span>
               </div>
             ) : null}
           </section>
@@ -541,6 +567,9 @@ function getErrorMessage(error: unknown): string {
   return 'Unexpected error';
 }
 
-function requiresAiTopdown(stylePreset: StylePreset, animationMode: AnimationMode): boolean {
-  return stylePreset === 'top-down-character' && (animationMode === 'topdown-4dir' || animationMode === 'topdown-walk-8');
+function requiresSemanticAnimation(stylePreset: StylePreset, animationMode: AnimationMode): boolean {
+  return (
+    stylePreset === 'top-down-character' &&
+    ['topdown-4dir', 'topdown-walk-8', 'topdown-idle-4dir', 'topdown-rpg-full-4dir'].includes(animationMode)
+  );
 }

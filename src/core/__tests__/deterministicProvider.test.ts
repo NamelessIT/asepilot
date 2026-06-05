@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { renderPlanToPng } from '../planRenderer';
 import { DeterministicProvider } from '../providers/deterministicProvider';
-import { ANIMATION_MODES, STYLE_PRESETS } from '../types';
+import { ANIMATION_MODES, STYLE_PRESETS, type AnimationMode } from '../types';
 
 describe('DeterministicProvider', () => {
   it('turns a real image into a valid plan and preview png', async () => {
@@ -462,11 +462,28 @@ describe('DeterministicProvider', () => {
         });
         expect(plan.layers.length).toBeGreaterThan(0);
         expect(plan.drawOps.length).toBeGreaterThan(0);
-        expect(plan.frames?.length ?? 1).toBe(animationMode === 'topdown-walk-8' ? 8 : animationMode === 'single' ? 1 : 4);
+        expect(plan.frames?.length ?? 1).toBe(expectedFrameCount(animationMode));
       }
     }
   });
 });
+
+function expectedFrameCount(animationMode: AnimationMode): number {
+  switch (animationMode) {
+    case 'single':
+      return 1;
+    case 'topdown-walk-8':
+      return 8;
+    case 'topdown-idle-4dir':
+      return 16;
+    case 'topdown-rpg-full-4dir':
+      return 136;
+    case 'idle-4frame':
+    case 'topdown-4dir':
+    case 'item-shine-4frame':
+      return 4;
+  }
+}
 
 async function readFrameHashes(imagePath: string, frameWidth: number, frameHeight: number): Promise<string[]> {
   const { data, info } = await sharp(imagePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });

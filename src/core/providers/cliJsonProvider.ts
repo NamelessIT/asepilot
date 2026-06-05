@@ -1,11 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execaCommand } from 'execa';
-import sharp from 'sharp';
 import { buildPixelPlanPrompt, parseAgentPlanOutput, requiresSemanticTopdown } from './agentJson';
 import { DeterministicProvider } from './deterministicProvider';
-import { rgbToHex } from '../color';
+import { extractReferenceIdentityPalette } from '../semanticIdentityGuard';
 import type { AgentProvider } from './agentProvider';
 import type { PixelPlan, PixelRequest } from '../types';
 
@@ -196,6 +195,7 @@ function interpolateCommand(command: string, request: PixelRequest): string {
   let nextCommand = command;
 
   nextCommand = replaceTemplateValue(nextCommand, 'imagePath', request.imagePath);
+  nextCommand = replaceTemplateValue(nextCommand, 'animationTemplatePath', request.animationTemplatePath ?? '');
   nextCommand = replaceTemplateValue(nextCommand, 'imageDir', dirname(request.imagePath));
   nextCommand = replaceTemplateValue(nextCommand, 'outputName', request.outputName);
   nextCommand = replaceTemplateValue(nextCommand, 'targetWidth', String(request.targetWidth), false);
@@ -203,7 +203,7 @@ function interpolateCommand(command: string, request: PixelRequest): string {
   nextCommand = replaceTemplateValue(nextCommand, 'stylePreset', request.stylePreset);
   nextCommand = replaceTemplateValue(nextCommand, 'animationMode', request.animationMode);
 
-  return nextCommand;
+  return appendCodexTemplateImage(nextCommand, request);
 }
 
 function replaceTemplateValue(command: string, key: string, value: string, quote = true): string {
@@ -229,7 +229,14 @@ async function buildCliPrompt(request: PixelRequest): Promise<string> {
     '',
     `Reference image path: ${request.imagePath}`,
     '',
+    request.animationTemplatePath ? `Animation template path: ${request.animationTemplatePath}` : '',
     'The reference image is attached to this Codex invocation with --image.',
+    request.animationTemplatePath && isImageFile(request.animationTemplatePath)
+      ? 'The animation template image is also attached to this Codex invocation with --image.'
+      : '',
+    request.animationTemplatePath && !isImageFile(request.animationTemplatePath)
+      ? 'The animation template is a non-image file path. If you cannot inspect it, still follow the requested animation frame order exactly.'
+      : '',
     'Do not run commands to inspect files. Do not inspect the AsePilot repository.',
     requiresSemanticTopdown(request)
       ? 'This semantic turnaround may be approximate. Prefer a compact readable sprite over exhaustive pixel-perfect detail.'
@@ -240,51 +247,36 @@ async function buildCliPrompt(request: PixelRequest): Promise<string> {
     .join('\n');
 }
 
+function appendCodexTemplateImage(command: string, request: PixelRequest): string {
+  const templatePath = request.animationTemplatePath?.trim();
+  if (!templatePath || !isImageFile(templatePath) || !/\bcodex\s+exec\b/.test(command) || command.includes(quoteCommandArg(templatePath))) {
+    return command;
+  }
+
+  const option = ` --image ${quoteCommandArg(templatePath)}`;
+
+  return /\s-\s*$/.test(command) ? command.replace(/\s-\s*$/, `${option} -`) : `${command}${option}`;
+}
+
+function isImageFile(filePath: string): boolean {
+  return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(extname(filePath).toLowerCase());
+}
+
 async function buildReferenceStyleInstruction(request: PixelRequest): Promise<string> {
   if (!requiresSemanticTopdown(request)) return '';
 
-  const colors = await extractReferencePalette(request);
-  if (colors.length === 0) return '';
+  const palette = await extractReferenceIdentityPalette(request.imagePath, request.targetWidth, request.targetHeight);
+  if (palette.all.length === 0) return '';
 
   return [
     'Reference identity lock:',
-    `- Dominant reference colors, in priority order: ${colors.join(', ')}.`,
-    '- Use these hue families as the main palette. Do not introduce unrelated purple, yellow, white, cyan, or pastel colors unless they are visible in the reference.',
+    `- Subject/creature colors, in priority order: ${palette.subject.join(', ')}.`,
+    `- Distinctive subject accent colors that must remain visible in drawOps: ${palette.subjectAccents.join(', ') || palette.subject.slice(0, 3).join(', ')}.`,
+    `- Background colors: ${palette.background.join(', ') || 'none detected'}. Do not use background colors as the creature shell/body replacement.`,
+    '- Use subject hue families as the main creature palette. Do not introduce unrelated purple, yellow, white, cyan, pastel, or brown body colors unless they are visible on the subject itself.',
     '- Frame Down must look like the attached reference sprite at the requested size, not like a redesigned icon.',
     '- Other directions may be approximate, but they must clearly read as the same creature/object using the same dark/light color placement and distinctive appendages.'
   ].join('\n');
-}
-
-async function extractReferencePalette(request: PixelRequest): Promise<string[]> {
-  const image = await sharp(request.imagePath)
-    .ensureAlpha()
-    .resize(request.targetWidth, request.targetHeight, {
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-      fit: 'contain',
-      kernel: 'nearest'
-    })
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const counts = new Map<string, number>();
-  const totalPixels = image.info.width * image.info.height;
-
-  for (let index = 0; index < totalPixels; index += 1) {
-    const offset = index * 4;
-    const alpha = image.data[offset + 3] ?? 0;
-    if (alpha < 8) continue;
-
-    const hex = rgbToHex({
-      r: Math.round((image.data[offset] ?? 0) / 8) * 8,
-      g: Math.round((image.data[offset + 1] ?? 0) / 8) * 8,
-      b: Math.round((image.data[offset + 2] ?? 0) / 8) * 8
-    }).toLowerCase();
-    counts.set(hex, (counts.get(hex) ?? 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .sort(([, left], [, right]) => right - left)
-    .slice(0, 12)
-    .map(([hex]) => hex);
 }
 
 function pixelPlanOutputSchema(): Record<string, unknown> {
@@ -367,7 +359,7 @@ function pixelPlanOutputSchema(): Record<string, unknown> {
       frames: {
         type: 'array',
         minItems: 1,
-        maxItems: 64,
+        maxItems: 160,
         items: {
           type: 'object',
           additionalProperties: false,

@@ -15,7 +15,15 @@ export const SEGMENTATION_MODES = ['none', 'auto-local', 'center-subject', 'ai-m
 
 export type SegmentationMode = (typeof SEGMENTATION_MODES)[number];
 
-export const ANIMATION_MODES = ['single', 'idle-4frame', 'topdown-4dir', 'topdown-walk-8', 'item-shine-4frame'] as const;
+export const ANIMATION_MODES = [
+  'single',
+  'idle-4frame',
+  'topdown-4dir',
+  'topdown-walk-8',
+  'topdown-idle-4dir',
+  'topdown-rpg-full-4dir',
+  'item-shine-4frame'
+] as const;
 
 export type AnimationMode = (typeof ANIMATION_MODES)[number];
 
@@ -25,6 +33,7 @@ export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number];
 
 export interface PixelRequest {
   imagePath: string;
+  animationTemplatePath?: string;
   targetWidth: number;
   targetHeight: number;
   paletteMax: number;

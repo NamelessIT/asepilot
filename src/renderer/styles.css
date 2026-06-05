@@ -149,6 +149,16 @@ button:disabled {
   gap: 8px;
 }
 
+.template-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+}
+
+.secondary-action.compact {
+  min-width: 76px;
+}
+
 .path-line {
   background: #f4f7f8;
   border: 1px solid #dce5e9;
